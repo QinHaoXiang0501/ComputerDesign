@@ -2,7 +2,6 @@ package frustration;
 
 import frustration.game.GameConfig;
 import frustration.game.GameFactory;
-import frustration.game.Game;
 import frustration.model.Player;
 import frustration.model.PlayerColor;
 import frustration.board.BoardType;
@@ -57,7 +56,7 @@ public final class Main {
         for (PlayerColor c : config.players()) wins.put(c, 0);
         for (int i = 0; i < games; i++) {
             Player winner = GameFactory.createGame(config).simulate();
-            wins.merge(winner.colour(), 1, Integer::sum);
+            wins.merge(winner.colour(), 1, (a, b) -> a + b);
         }
         System.out.println("Simulated " + games + " games");
         for (PlayerColor c : config.players()) {
@@ -68,6 +67,7 @@ public final class Main {
 
     private static void printUsage() {
         System.out.println("Usage: java frustration.Main [options]");
+        System.out.println();
         System.out.println("Options:");
         System.out.println("  --dice two|single       dice mode (default: two)");
         System.out.println("  --hit on|off            HIT rule: victim sent home (default: off)");
@@ -77,6 +77,14 @@ public final class Main {
         System.out.println("  --rolls n,n,n,...       fixed dice sequence for a single run (testing)");
         System.out.println("  --games N               run N random games and report win rate (default: 1)");
         System.out.println("  --help                  show this help");
+        System.out.println();
+        System.out.println("Examples:");
+        System.out.println("  java frustration.Main --rolls 12,12,7,8");
+        System.out.println("  java frustration.Main --players 4");
+        System.out.println("  java frustration.Main --dice single --hit on --precision on --board large --players 4");
+        System.out.println("  java frustration.Main --games 1000");
+        System.out.println();
+        System.out.println("Run the brief's worked examples: java frustration.demo.Demos");
     }
 
     /** Parsed command-line arguments. */
