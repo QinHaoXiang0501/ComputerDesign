@@ -2,12 +2,15 @@ package frustration;
 
 import frustration.game.GameConfig;
 import frustration.game.GameFactory;
+import frustration.game.UndoDecision;
 import frustration.model.Player;
 import frustration.model.PlayerColor;
 import frustration.board.BoardType;
 
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Scanner;
 
 /**
  * Command-line runner for Simple Frustration.
@@ -27,6 +30,11 @@ import java.util.Map;
 public final class Main {
 
     public static void main(String[] args) {
+        if (args.length == 0) {
+            runInteractiveMenu();  // no flags -> the interactive menu (matches the brief)
+            return;
+        }
+
         Args a = Args.parse(args);
         if (a.help) {
             printUsage();
@@ -48,6 +56,96 @@ public final class Main {
             if (a.rolls != null) config.useFixedDice(a.rolls);
             GameFactory.createGame(config).play();
         }
+    }
+
+    /** Interactive menu shown when the program is run without command-line flags. */
+    private static void runInteractiveMenu() {
+        Scanner in = new Scanner(System.in);
+        GameConfig config = GameConfig.getInstance();
+
+        boolean play = false;
+        while (!play) {
+            System.out.println("========");
+            System.out.println("Simple Frustration");
+            System.out.println("========");
+            System.out.print("[Enter] Basic Game, [C] Configure Game, [U] Interactive Undo, or [Q] Exit: ");
+            String choice = in.nextLine().trim().toLowerCase();
+            switch (choice) {
+                case "":                     // Basic Game - defaults already in place
+                    config.reset();
+                    play = true;
+                    break;
+
+                case "c":                    // Configure Game
+                    configure(config, in);
+                    play = true;
+                    break;
+
+                case "u":                    // Interactive Undo - basic game with undo
+                    config.reset();
+                    GameFactory.createGame(config).playWith(interactiveUndo(in));
+                    return;
+
+                case "q":                    // Exit
+                    System.out.println("Bye.");
+                    return;
+
+                default:
+                    System.out.println("Unrecognised option - try Enter, C, U or Q.");
+                    System.out.println();
+                    break;
+            }
+        }
+
+        GameFactory.createGame(config).play();
+    }
+
+    /** Ask the five variant questions and apply them to {@code config}. */
+    private static void configure(GameConfig config, Scanner in) {
+        System.out.println();
+        System.out.println("Configure Game");
+        System.out.println("--------------");
+        boolean large = promptChoice(in, "Board:    [1] Standard  [2] Large: ", new int[]{1, 2}, 1) == 2;
+        int players = promptChoice(in, "Players:  [2] Two  [4] Four: ", new int[]{2, 4}, 2);
+        boolean exact = promptChoice(in, "END:      [1] Land on or beyond  [2] Exact: ", new int[]{1, 2}, 1) == 2;
+        boolean hit = promptChoice(in, "HIT:      [1] Ignore  [2] Send HOME: ", new int[]{1, 2}, 1) == 2;
+        boolean single = promptChoice(in, "Dice:     [1] Single  [2] Two dice: ", new int[]{1, 2}, 2) == 1;
+
+        config.reset();
+        config.useBoard(large ? BoardType.LARGE : BoardType.STANDARD);
+        config.usePlayers(players == 4
+                ? new PlayerColor[]{PlayerColor.RED, PlayerColor.BLUE, PlayerColor.GREEN, PlayerColor.YELLOW}
+                : new PlayerColor[]{PlayerColor.RED, PlayerColor.BLUE});
+        if (exact) config.enableExactLanding(); else config.disableExactLanding();
+        if (hit) config.enableHit(); else config.disableHit();
+        if (single) config.useSingleDice(); else config.useTwoDice();
+        System.out.println();
+    }
+
+    /** Read one of {@code allowed}, or {@code defaultValue} on a blank line. */
+    private static int promptChoice(Scanner in, String label, int[] allowed, int defaultValue) {
+        while (true) {
+            System.out.print(label);
+            String line = in.nextLine().trim();
+            if (line.isEmpty()) return defaultValue;
+            try {
+                int v = Integer.parseInt(line);
+                for (int a : allowed) if (v == a) return v;
+            } catch (NumberFormatException ignored) {
+                // fall through to the error message
+            }
+            System.out.println("  -> please enter one of " + Arrays.toString(allowed)
+                    + " (or press Enter to keep " + defaultValue + ").");
+        }
+    }
+
+    /** An undo hook that asks the player Y/N after each roll. */
+    private static UndoDecision interactiveUndo(Scanner in) {
+        return turn -> {
+            System.out.print("Undo this roll? [Y/N]: ");
+            String ans = in.nextLine().trim().toLowerCase();
+            return ans.startsWith("y");
+        };
     }
 
     /** Run many random games and report each player's win rate. */
